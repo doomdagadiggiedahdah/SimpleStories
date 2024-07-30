@@ -1,5 +1,5 @@
 import random
-import google.generativeai as genai
+#import google.generativeai as genai
 from openai import OpenAI
 import hashlib
 import json
@@ -17,55 +17,22 @@ class StoryParams:
         self.verb = verb
         self.noun = noun
         self.adjective = adjective
-
         self.story_features = story_features
 
-# not sure if the Params Generator will still be used, I think we want something more deterministic.
-
-class StoryParamsGenerator:
-    def __init__(self, accepted_verbs, accepted_nouns, accepted_adjectives, story_features_list, story_features_cum_weights):
-        self.accepted_verbs = accepted_verbs
-        self.accepted_nouns = accepted_nouns
-        self.accepted_adjectives = accepted_adjectives
-
-        self.story_features_list = story_features_list
-        self.story_features_cum_weights = story_features_cum_weights
-
-    def generate(self) -> StoryParams:
-        verb = random.choice(self.accepted_verbs)
-        noun = random.choice(self.accepted_nouns)
-        adjective = random.choice(self.accepted_adjectives)
-
-        story_features = random.choices(self.story_features_list, cum_weights=self.story_features_cum_weights)[0]
-
-        return StoryParams(verb, noun, adjective, story_features)
-    
 
 def create_tiny_story_prompt(params: StoryParams):
-    noun, verb, adjective = params.noun, params.verb, params.adjective
+    noun, verb, adjective, features = params.noun, params.verb, params.adjective, params.story_features
 
-    story_features_combined = [features[f] for f in params.story_features]
-    if len(story_features_combined) == 1:
-        story_features_combined = story_features_combined[0]
-    else:
-        story_features_combined = ', '.join(story_features_combined[:-1]) + ' y ' + story_features_combined[-1]
-    prompt_template = (
-        prompt = f"""Write a short story (3-5 paragraphs) which only uses very simple words that a 3 year old child would likely understand. 
-                    The story should use the verb ”{verb}”, the noun ”{noun}” and the adjective ”{adjective}”. The story
-                    should have the following features: {story_features_combined}
-                    Remember to only use simple words!""")
+    prompt_template = (f"""\
+        Write a short story (3-5 paragraphs) which only uses very simple words that a 3 year old child would likely understand. 
+        The story should use the verb ”{verb}”, the noun ”{noun}” and the adjective ”{adjective}”. The story
+        should have the following features: {features}
+        Remember to only use simple words!""")
     prompt = prompt_template.format(**locals())
     return prompt
 
     
-def generate_tiny_story(gen_model):
-    rand_verb = random.choice(test_verbs)
-    rand_noun = random.choice(test_nouns)
-    rand_adj  = random.choice(test_adjectives)
-    rand_feat = random.choices(features)
-
-    #params = StoryParamsGenerator()
-    params = StoryParams(rand_verb, rand_noun, rand_adj, rand_feat)
+def generate_tiny_story(gen_model, params):
     prompt = create_tiny_story_prompt(params)    
     story = gen_model.generate_content(prompt)
     
@@ -84,13 +51,19 @@ def generate_tiny_story(gen_model):
     return json_struct
 
 
-def generate_and_log_tiny_stories(gen_model, params_generator: StoryParamsGenerator, num_stories: int):#, thread_id: int = 0):    
+def generate_and_log_tiny_stories(gen_model, num_stories: int):#, thread_id: int = 0):    
+    rand_verb = random.choice(test_verbs)
+    rand_noun = random.choice(test_nouns)
+    rand_adj  = random.choice(test_adjectives)
+    rand_feat = random.choices(features)
+    params = StoryParams(rand_verb, rand_noun, rand_adj, rand_feat)
+
     for i in range(0, num_stories):
         try:
-            story = generate_tiny_story(gen_model, params_generator)
+            story = generate_tiny_story(gen_model, params)
             if story:
                 md5 = hashlib.md5(story['story'].encode()).hexdigest()
-                with open(f'spanish_stories/generated_story_{thread_id}_{i}_{md5}.json', 'w') as fp:
+                with open(f'spanish_stories/generated_story_{i}_{md5}.json', 'w') as fp:
                     json.dump(story, fp)
             else:
                 print('Error generating story', i)
@@ -102,27 +75,6 @@ def generate_and_log_tiny_stories(gen_model, params_generator: StoryParamsGenera
             print('At index', i)
 
 
-
-#def main():
-    #GEMINI_API_KEY = open(os.path.expanduser('~/.gemini_api_key'), 'r').read().strip()
-    #genai.configure(api_key=GEMINI_API_KEY)
-    #safety_settings = [{'category': c, 'threshold': 'BLOCK_NONE'} for c in
-                    #['HARM_CATEGORY_DANGEROUS', 'HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH',
-                     #'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT']]
-    #flash = genai.GenerativeModel('gemini-1.5-flash', safety_settings=safety_settings)
-
-    #story_params_generator = pickle.load(open('story_params_generator.pkl', 'rb'))
-    #threads = []
-    #NUM_DESIRED_STORIES = 2500000
-    #NUM_THREADS = 40
-    #for i in range(NUM_THREADS):
-        #thread = threading.Thread(target=generate_and_log_tiny_stories, args=(flash, story_params_generator, NUM_DESIRED_STORIES // NUM_THREADS, i))
-        #threads.append(thread)
-        #thread.start()
-
-    #for thread in threads:
-        #thread.join()
-
 def main():
     #client = OpenAI()
     #completion = client.chat.completions.create(
@@ -131,8 +83,12 @@ def main():
             #{"role": "user", "content": generate_and_log_tiny_stories}
         #]
     #)
-
-
+    rand_verb = random.choice(test_verbs)
+    rand_noun = random.choice(test_nouns)
+    rand_adj  = random.choice(test_adjectives)
+    rand_feat = random.choices(features)
+    params = StoryParams(rand_verb, rand_noun, rand_adj, rand_feat)
+    print(create_tiny_story_prompt(params))
 
     
 if __name__ == '__main__':
