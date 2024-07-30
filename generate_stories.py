@@ -70,30 +70,18 @@ def generate_tiny_story(gen_model, params: StoryParams):
         }
 
 
-def generate_and_log_tiny_stories(gen_model, params: StoryParams):#, thread_id: int = 0):    
+def generate_and_log_tiny_stories(gen_model, params: StoryParams, num_stories):#, thread_id: int = 0):    
     params = StoryParams(params.verb, params.noun, params.adjective, params.story_features)
     json_struct = generate_tiny_story(gen_model, params)
+
+    filename = 'stories.json' if 'story' in json_struct else 'failed_stories.json'
+    with open(filename, "a") as f:
+        json.dump(json_struct, f)
+        f.write('\n')
     return json_struct
 
-    #for i in range(0, num_stories):
-        #try:
-            #story = generate_tiny_story(gen_model, params)
-            #if story:
-                #md5 = hashlib.md5(story['story'].encode()).hexdigest()
-                #with open(f'generated_story_{i}_{md5}.json', 'w') as fp:
-                    #json.dump(story, fp)
-            #else: # haven't tested this failure capture yet
-                #with open(f'failed_attempts.json', 'a') as f:
-                    #json.dump(json_struct, f)
-        #except Exception as e:
-            #print('Error generating story', i, e)
-            #print('sleeping for 10 seconds at index', i)
-            #time.sleep(10)
-        #if i % 1000 == 0:
-            #print('At index', i)
 
-
-def main(num_stories=2):
+def main(num_stories):
     for i in range(num_stories):
         rand_verb = random.choice(test_verbs)
         rand_noun = random.choice(test_nouns)
@@ -102,7 +90,7 @@ def main(num_stories=2):
         params = StoryParams(rand_verb, rand_noun, rand_adj, rand_feat)
 
         print(create_tiny_story_prompt(params))
-        data = generate_and_log_tiny_stories("openai", params)
+        data = generate_and_log_tiny_stories("openai", params, num_stories)
         print(data)
 
     
