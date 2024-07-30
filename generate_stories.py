@@ -43,46 +43,48 @@ def generate_content(gen_model, prompt):
                 ]
             )
             return story.choices[0].message.content
-    
+
+
 def generate_tiny_story(gen_model, params: StoryParams):
-    prompt = create_tiny_story_prompt(params)    
-    story = generate_content(gen_model, prompt)
-    return story
+    prompt = create_tiny_story_prompt(params)
     
-    #try:
-        #story_text = story.text
-    #except ValueError as e:
-        #print('Error:', e)
-        #return None
-    #json_struct = {'instruction': {
-        #'features': list(params.story_features), 
-        #'prompt': prompt,
-        #'words': [params.verb, params.noun, params.adjective]
-        #},
-        #'story': story_text,
-        #'source': 'gemini-1.5-flash'}
-    #return json_struct
+    try:
+        story = generate_content(gen_model, prompt)
+        return {
+            'instruction': {
+                'features': list(params.story_features),
+                'prompt': prompt,
+                'words': [params.verb, params.noun, params.adjective]
+            },
+            'story': story,
+            'source': f'{gen_model}'
+        }
+    except ValueError as e:
+        return {
+            'instruction': {
+                'features': list(params.story_features),
+                'words': [params.verb, params.noun, params.adjective]
+            },
+            'error': str(e),
+            'source': f'{gen_model}'
+        }
 
 
-def generate_and_log_tiny_stories(gen_model):#, thread_id: int = 0):    
-    rand_verb = random.choice(test_verbs)
-    rand_noun = random.choice(test_nouns)
-    rand_adj  = random.choice(test_adjectives)
-    rand_feat = random.choices(features)
-
-    params = StoryParams(rand_verb, rand_noun, rand_adj, rand_feat)
-    story = generate_tiny_story(gen_model, params)
-    return story
+def generate_and_log_tiny_stories(gen_model, params: StoryParams):#, thread_id: int = 0):    
+    params = StoryParams(params.verb, params.noun, params.adjective, params.story_features)
+    json_struct = generate_tiny_story(gen_model, params)
+    return json_struct
 
     #for i in range(0, num_stories):
         #try:
             #story = generate_tiny_story(gen_model, params)
             #if story:
                 #md5 = hashlib.md5(story['story'].encode()).hexdigest()
-                #with open(f'spanish_stories/generated_story_{i}_{md5}.json', 'w') as fp:
+                #with open(f'generated_story_{i}_{md5}.json', 'w') as fp:
                     #json.dump(story, fp)
-            #else:
-                #print('Error generating story', i)
+            #else: # haven't tested this failure capture yet
+                #with open(f'failed_attempts.json', 'a') as f:
+                    #json.dump(json_struct, f)
         #except Exception as e:
             #print('Error generating story', i, e)
             #print('sleeping for 10 seconds at index', i)
@@ -91,23 +93,18 @@ def generate_and_log_tiny_stories(gen_model):#, thread_id: int = 0):
             #print('At index', i)
 
 
-def main():
-    #client = OpenAI()
-    #completion = client.chat.completions.create(
-        #model="gpt-4o",
-        #messages=[
-            #{"role": "user", "content": generate_and_log_tiny_stories}
-        #]
-    #)
-    rand_verb = random.choice(test_verbs)
-    rand_noun = random.choice(test_nouns)
-    rand_adj  = random.choice(test_adjectives)
-    rand_feat = random.choices(features)
-    params = StoryParams(rand_verb, rand_noun, rand_adj, rand_feat)
-    print(create_tiny_story_prompt(params))
-    print(generate_and_log_tiny_stories("openai"))
+def main(num_stories=2):
+    for i in range(num_stories):
+        rand_verb = random.choice(test_verbs)
+        rand_noun = random.choice(test_nouns)
+        rand_adj  = random.choice(test_adjectives)
+        rand_feat = random.choices(features)
+        params = StoryParams(rand_verb, rand_noun, rand_adj, rand_feat)
+
+        print(create_tiny_story_prompt(params))
+        data = generate_and_log_tiny_stories("openai", params)
+        print(data)
 
     
 if __name__ == '__main__':
-    main()
-    
+    main(num_stories=1)
