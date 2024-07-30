@@ -7,6 +7,7 @@ import json
 import os
 import time
 
+# TODO: finalize these sets
 features = ["dialogue", "moral value", "plot twist", "foreshadowing", "conflict"] # "bad endings" is taken out. this list is taken directly from the paper
 test_verbs = ["run", "jump", "play", "eat", "sleep", "drink", "sing", "draw", "dance", "swim"]
 test_nouns = ["cat", "dog", "ball", "toy", "mom", "dad", "car", "book", "bed", "cup"]
@@ -32,6 +33,7 @@ def create_tiny_story_prompt(params: StoryParams):
     return prompt
 
 
+# TODO: add additional models
 def generate_content(gen_model, prompt):
     match gen_model:
         case "openai":
@@ -47,17 +49,19 @@ def generate_content(gen_model, prompt):
 
 def generate_tiny_story(gen_model, params: StoryParams):
     prompt = create_tiny_story_prompt(params)
+    id = hashlib.md5(prompt.encode()).hexdigest()
     
     try:
         story = generate_content(gen_model, prompt)
         return {
+            'id': id,
+            'story': story,
             'instruction': {
                 'features': list(params.story_features),
                 'prompt': prompt,
                 'words': [params.verb, params.noun, params.adjective]
             },
-            'story': story,
-            'source': f'{gen_model}'
+            'model': gen_model
         }
     except ValueError as e:
         return {
@@ -66,7 +70,7 @@ def generate_tiny_story(gen_model, params: StoryParams):
                 'words': [params.verb, params.noun, params.adjective]
             },
             'error': str(e),
-            'source': f'{gen_model}'
+            'model': gen_model
         }
 
 
@@ -83,6 +87,7 @@ def generate_and_log_tiny_stories(gen_model, params: StoryParams, num_stories):#
 
 def main(num_stories):
     for i in range(num_stories):
+        # TODO: figure out the combos of all vna and features.
         rand_verb = random.choice(test_verbs)
         rand_noun = random.choice(test_nouns)
         rand_adj  = random.choice(test_adjectives)
@@ -95,4 +100,4 @@ def main(num_stories):
 
     
 if __name__ == '__main__':
-    main(num_stories=1)
+    main(num_stories=3)
