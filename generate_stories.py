@@ -36,11 +36,12 @@ def create_tiny_story_prompt(params: StoryParams):
     return prompt
 
 
-# TODO: add additional models
+# TODO: add Gemma
 def generate_content(gen_model, prompt):
     match gen_model:
         case "openai":
-            client = OpenAI()
+            api_key = os.getenv('OPENAI_TS_API_KEY')
+            client = OpenAI(api_key=api_key)
             story = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
@@ -111,8 +112,8 @@ def main(num_stories):
         print(create_tiny_story_prompt(params))
         data = generate_and_log_tiny_stories("openai", params, num_stories)
         print(f"openai: {data}")
-        data = generate_and_log_tiny_stories("anthropic", params, num_stories)
-        print(f"anthropic: {data}")
+        #data = generate_and_log_tiny_stories("anthropic", params, num_stories)
+        #print(f"anthropic: {data}")
 
     
 if __name__ == '__main__':
