@@ -1,4 +1,5 @@
 import random
+from pprint import pformat
 #import google.generativeai as genai
 from openai import OpenAI
 import hashlib
@@ -95,8 +96,8 @@ def generate_and_log_tiny_stories(gen_model, params: StoryParams, num_stories):#
 
     filename = 'stories.json' if 'story' in json_struct else 'failed_stories.json'
     with open(filename, "a") as f:
-        json.dump(json_struct, f)
-        f.write('\n')
+        formatted_json = pformat(json_struct)
+        f.write(formatted_json + '\n')
     return json_struct
 
 
@@ -111,10 +112,11 @@ def main(num_stories):
 
         print(create_tiny_story_prompt(params))
         data = generate_and_log_tiny_stories("openai", params, num_stories)
-        print(f"openai: {data}")
+        time.sleep(1)
+        #print(f"openai: {data}")
         #data = generate_and_log_tiny_stories("anthropic", params, num_stories)
         #print(f"anthropic: {data}")
 
     
 if __name__ == '__main__':
-    main(num_stories=1)
+    main(1)
