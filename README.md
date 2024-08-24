@@ -3,7 +3,7 @@
 - Link to (model training code)[https://github.com/danbraunai/simple_stories_train]
 
 ## Usage
-- To use the OpenAI API, create an environment variable named `OPENAI_TS_API_KEY`
+- To use the OpenAI API, create an environment variable named `OPENAI_API_KEY_SIMPLESTORIES`
 
 ## Thanks to:
 - Story generation code based on: https://github.com/rrenaud/multilingual_tinystories/tree/main
