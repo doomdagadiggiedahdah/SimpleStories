@@ -1,4 +1,5 @@
 import random
+import json
 import os
 from openai import OpenAI
 import hashlib
@@ -87,7 +88,7 @@ def generate_simple_story(gen_model, params: dict):
 
 def generate_and_log_simple_stories(gen_model: str, params: dict, formatted_time: str):
     json_struct = generate_simple_story(gen_model, params)
-    formatted_json = pformat(json_struct)
+    formatted_json = json.dumps(json_struct)
 
     for item in json_struct:
         filename = f'data/stories-{gen_model}-{formatted_time}.jsonl' if 'story' in item else f'data/failed_data-{formatted_time}.jsonl'
