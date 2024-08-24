@@ -1,5 +1,4 @@
 import random
-from pprint import pformat
 import os
 from openai import OpenAI
 import hashlib
@@ -8,7 +7,7 @@ import anthropic
 import concurrent.futures
 from datetime import datetime
 
-NUM_STORIES_PER_COMPLETION = 10
+MAX_STORIES_PER_COMPLETION = 40
 
 class RateLimitException(Exception):
     pass
@@ -25,20 +24,23 @@ def get_random_params():
         "topic": random.choice(topics).lower(),
         "style": random.choice(styles).lower(),
         "feature": random.choice(features),
-        "num_paragraphs": random.randint(2, 6),
+        "num_paragraphs": random.randint(1, 8),
     }
 
 def create_simple_story_prompt(params):
+    num_stories_per_completion = MAX_STORIES_PER_COMPLETION // max(3, params['num_paragraphs'])
+
+    singular = params['num_paragraphs'] == 1
     template_singular = f"Write a short story ({params['num_paragraphs']} paragraphs) which only uses very simple words that a young child would understand.\nThe story "
-    template_plural = f"Write {NUM_STORIES_PER_COMPLETION} short stories ({params['num_paragraphs']} paragraphs each) which only use very simple words that a young child would understand. Do not number each story or write a headline. Make the stories diverse by fully exploring the theme, but make each story self-contained. Separate the stories by finishing each one with 'THE END.'\nEach story "
-    template = "should be about {theme}, include {topic}, be {style} in its writing style and ideally feature {feature}. Do not use proper names. Complex narrative structure is great, but please remember to only use basic vocabulary."
-    if NUM_STORIES_PER_COMPLETION == 1:
+    template_plural = f"Write {num_stories_per_completion} short stories ({params['num_paragraphs']} paragraph{'' if singular else 's'} each) which only use very simple words that a young child would understand. Do not number each story or write a headline. Make the stories diverse by fully exploring the theme, but make each story self-contained. Separate the stories by finishing each one with 'THE END.'\nEach story "
+    template = "should be about {theme}, include {topic}, be {style} in its writing style and ideally feature {feature}. If you need to use proper names, use constructions from common words. Either avoid giving characters a name, or select from Mia, Alex, Jean, Samuel, Lily, Leo, Jose, Kim, Alice, Lena, Rita, Emmanuel, Anne, Peter, Maria, Luis and derivations of these. Complex narrative structure is great, but please remember to only use basic vocabulary."
+    if singular:
         template = template_singular + template
     else:
         template = template_plural + template
          
     prompt = template.format(**params)
-    return prompt
+    return prompt, num_stories_per_completion
 
 def generate_content(gen_model, prompt):
     assert "gpt" in gen_model or "claude" in gen_model, "Invalid model name"
@@ -52,24 +54,27 @@ def generate_content(gen_model, prompt):
         )
         completion = completion.choices[0].message.content
     elif "claude" in gen_model:  # Anthropic
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY_SIMPLESTORIES"])
         completion = client.messages.create(
             model=gen_model,
-            max_tokens=1024*NUM_STORIES_PER_COMPLETION,
+            max_tokens=min(1024*MAX_STORIES_PER_COMPLETION, 8192),
             messages=[
                 {"role": "user", "content": prompt}
-            ]
+            ],
         )
         completion = completion.content[0].text
-    stories = [x.strip() for x in completion.split("THE END.")]
-    return stories
+    
+    return completion
 
 def generate_simple_story(gen_model, params: dict):
-    prompt = create_simple_story_prompt(params)
+    prompt, expected_num_stories = create_simple_story_prompt(params)
     id = hashlib.md5(prompt.encode()).hexdigest()
     
     try:
-        stories = generate_content(gen_model, prompt)
+        completion = generate_content(gen_model, prompt)
+        stories = [x.strip() for x in completion.split("THE END.")]
+        if (len(stories) != expected_num_stories):
+            print(f"Completion did not include expected number of stories, actual={len(stories)} != expected={expected_num_stories}\nend of completion: {completion[-100:]}")
         return [{
             'id': id,
             'story': story,
@@ -85,7 +90,7 @@ def generate_and_log_simple_stories(gen_model: str, params: dict, formatted_time
     formatted_json = pformat(json_struct)
 
     for item in json_struct:
-        filename = f'data/stories-{formatted_time}.jsonl' if 'story' in item else f'data/failed_data-{formatted_time}.jsonl'
+        filename = f'data/stories-{gen_model}-{formatted_time}.jsonl' if 'story' in item else f'data/failed_data-{formatted_time}.jsonl'
         with open(filename, "a") as f:
             f.write(formatted_json + '\n')
         return json_struct
@@ -99,7 +104,7 @@ def worker_thread(gen_model: str, params: dict, formatted_time: str):
             time.sleep(5)
             continue
 
-def main(num_completions: int, num_threads: int = 20):
+def main(num_completions: int, num_threads: int = 20, model = "gpt-4o-mini"):
     if not os.path.exists("data"):
         os.makedirs("data")
     now = datetime.now()
@@ -107,7 +112,7 @@ def main(num_completions: int, num_threads: int = 20):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
         future_to_story = {
-            executor.submit(worker_thread, "gpt-4o-mini", get_random_params(),
+            executor.submit(worker_thread, model, get_random_params(),
                             formatted_time): i for i in range(num_completions)
         }
 
@@ -118,4 +123,4 @@ def main(num_completions: int, num_threads: int = 20):
                 print(f"Story generation failed with exception: {e}")
 
 if __name__ == '__main__':
-    main(2, num_threads=2)
+    main(2, num_threads=2, model="claude-3-5-sonnet-20240620")

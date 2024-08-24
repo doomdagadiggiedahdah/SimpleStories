@@ -8,15 +8,16 @@ def get_batch_dataset(num_completions, model):
     lines = []
     total_tokens = 0
     enc = tiktoken.encoding_for_model(model)
-    
+
     for i in range(num_completions):
-        prompt = create_simple_story_prompt(get_random_params())
+        params = get_random_params()
+        prompt = create_simple_story_prompt(params)
         message_tokens = len(enc.encode(prompt))
         total_tokens += message_tokens
         messages=[{"role": "user", "content": prompt}]
 
         lines.append(json.dumps(
-            {"custom_id": str(i),
+            {"custom_id": str(i)+json.dumps(params),
             "method": "POST",
             "url": "/v1/chat/completions",
             "body": {"model": model, "messages": messages}}
