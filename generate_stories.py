@@ -6,9 +6,11 @@ import hashlib
 import time
 import anthropic
 import concurrent.futures
+from tqdm import tqdm
 from datetime import datetime
 
 MAX_STORIES_PER_COMPLETION = 40
+END_STRING = "[END]"
 
 class RateLimitException(Exception):
     pass
@@ -33,7 +35,7 @@ def create_simple_story_prompt(params):
 
     singular = params['num_paragraphs'] == 1
     template_singular = f"Write a short story ({params['num_paragraphs']} paragraphs) which only uses very simple words that a young child would understand.\nThe story "
-    template_plural = f"Write {num_stories_per_completion} short stories ({params['num_paragraphs']} paragraph{'' if singular else 's'} each) which only use very simple words that a young child would understand. Do not number each story or write a headline. Make the stories diverse by fully exploring the theme, but make each story self-contained. Separate the stories by finishing each one with 'THE END.'\nEach story "
+    template_plural = f"Write {num_stories_per_completion} short stories ({params['num_paragraphs']} paragraph{'' if singular else 's'} each) which only use very simple words that a young child would understand. Do not number each story or write a headline. Make the stories diverse by fully exploring the theme, but make each story self-contained. Separate the stories by putting the string {END_STRING} in between.\nEach story "
     template = "should be about {theme}, include {topic}, be {style} in its writing style and ideally feature {feature}. If you need to use proper names, use constructions from common words. Either avoid giving characters a name, or select from Mia, Alex, Jean, Samuel, Lily, Leo, Jose, Kim, Alice, Lena, Rita, Emmanuel, Anne, Peter, Maria, Luis and derivations of these. Complex narrative structure is great, but please remember to only use basic vocabulary."
     if singular:
         template = template_singular + template
@@ -73,24 +75,26 @@ def generate_simple_story(gen_model, params: dict):
     
     try:
         completion = generate_content(gen_model, prompt)
-        stories = [x.strip() for x in completion.split("THE END.")]
+        stories = [x.strip() for x in completion.split(END_STRING) if len(x.strip()) > 1]
         if (len(stories) != expected_num_stories):
             print(f"Completion did not include expected number of stories, actual={len(stories)} != expected={expected_num_stories}\nend of completion: {completion[-100:]}")
         return [{
-            'id': id,
+            'generation_id': id + "-" + str(k),
             'story': story,
             'model': gen_model,
+            'num_stories_in_completion': len(stories),
+            "expected_num_stories_in_completion": expected_num_stories,
             **params
-        } for story in stories]
+        } for k, story in enumerate(stories)]
     except Exception as e:
         # TODO Implement Rate Limit Logic for different APIs
         raise RateLimitException(e)
 
 def generate_and_log_simple_stories(gen_model: str, params: dict, formatted_time: str):
     json_struct = generate_simple_story(gen_model, params)
-    formatted_json = json.dumps(json_struct)
-
+    
     for item in json_struct:
+        formatted_json = json.dumps(item)
         filename = f'data/stories-{gen_model}-{formatted_time}.jsonl' if 'story' in item else f'data/failed_data-{formatted_time}.jsonl'
         with open(filename, "a") as f:
             f.write(formatted_json + '\n')
@@ -113,15 +117,17 @@ def main(num_completions: int, num_threads: int = 20, model = "gpt-4o-mini"):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
         future_to_story = {
-            executor.submit(worker_thread, model, get_random_params(),
-                            formatted_time): i for i in range(num_completions)
+            executor.submit(worker_thread, model, get_random_params(), formatted_time): i for i in range(num_completions)
         }
 
-        for future in concurrent.futures.as_completed(future_to_story):
+        for future in tqdm(concurrent.futures.as_completed(future_to_story), total=num_completions, desc="Generating stories"):
             try:
                 data = future.result()
             except Exception as e:
                 print(f"Story generation failed with exception: {e}")
 
+# Reference models: ["gpt-4o", "gpt-4o-mini", "claude-sonnet-3.5-20240620"]
 if __name__ == '__main__':
-    main(2, num_threads=2, model="claude-3-5-sonnet-20240620")
+    NUM_COMPLETIONS = 25
+
+    main(NUM_COMPLETIONS, num_threads=2, model="claude-3-5-sonnet-20240620")

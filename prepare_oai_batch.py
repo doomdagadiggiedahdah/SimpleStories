@@ -36,4 +36,4 @@ def main(num_completions: int, model = "gpt-4o-mini"):
         fp.write("\n".join(lines))
 
 if __name__ == '__main__':
-    main(2)
+    main(20)
