@@ -38,14 +38,15 @@ def create_simple_story_prompt(params):
     num_stories_per_completion = MAX_STORIES_PER_COMPLETION // max(3, params['num_paragraphs'])
 
     singular = params['num_paragraphs'] == 1
-    template_singular = f"Write a short story ({params['num_paragraphs']} paragraphs) using very basic words that a young child could understand. \nThe story "
+    template_singular = f"Write a short story ({params['num_paragraphs']} paragraphs) using very basic words that a preschool child could understand. \nThe story "
     template_plural = f"Write {num_stories_per_completion} short stories ({params['num_paragraphs']} paragraph{'' if singular else 's'} each) using very basic words that a young child could understand. Do not number each story or write a headline. Make the stories diverse by fully exploring the theme, but each story should be self-contained. Separate the stories by putting {END_STRING} in between.\nEach story "
-    template = "should be about {theme}, include {topic}, be {style} in its writing style and ideally feature {feature}.{grammar} If you need to use proper names, make them from common words. Either don't give characters a name, or select from Mia, Alex, Jean, Samuel, Lily, Leo, Jose, Kim, Alice, Lena, Rita, Emmanuel, Anne, Peter, Maria, Luis and derivations of these. Complex story structure is great, but please always use the simplest words possible."
+    template = "should be about {theme}, include {topic}, be {style} in its writing style and ideally feature {feature}.{grammar} If you need to use proper names, make them from space-separated common words. Either don't give characters a name, or select from Mia, Alex, Jean, Samuel, Lily, Leo, Jose, Kim, Alice, Lena, Rita, Emmanuel, Anne, Peter, Maria or Luis. Complex story structure is great, but please remember to only use simple words."
     if singular:
         template = template_singular + template
     else:
         template = template_plural + template
     
+    params = params.copy()
     if params['grammar']:
         params['grammar'] = f" The most important thing is to write an engaging easy story, but where it makes sense, demonstrate the use of {params['grammar']}."
 
@@ -58,6 +59,7 @@ def generate_content(gen_model, prompt):
         client = OpenAI(api_key=os.environ["OPENAI_API_KEY_SIMPLESTORIES"])
         completion = client.chat.completions.create(
             model=gen_model,
+            top_p=0.7,
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -68,7 +70,6 @@ def generate_content(gen_model, prompt):
         completion = client.messages.create(
             model=gen_model,
             max_tokens=min(1024*MAX_STORIES_PER_COMPLETION, 8192),
-            top_p=0.9,
             messages=[
                 {"role": "user", "content": prompt}
             ],
@@ -77,23 +78,35 @@ def generate_content(gen_model, prompt):
     
     return completion
 
+def process_completion(gen_model, completion, params, expected_num_stories=None):
+    id = hashlib.md5(completion.encode()).hexdigest()
+    stories = [x.strip() for x in completion.split(END_STRING) if len(x.strip()) > 1]
+    table = str.maketrans({
+                "\u201d": "\"",
+                "\u201c": "\"",
+                "\u2019": "'",
+                "\u2018": "'",
+                "\u2014": "-",
+                "\u2026": "..."
+    })
+    stories = [x.translate(table) for x in stories]
+    if (len(stories) != expected_num_stories and expected_num_stories):
+        print(f"Completion did not include expected number of stories, actual={len(stories)} != expected={expected_num_stories}\nend of completion: {completion[-100:]}")
+    return [{
+        'generation_id': id + "-" + str(k),
+        'story': story,
+        'model': gen_model,
+        'num_stories_in_completion': len(stories),
+        "expected_num_stories_in_completion": expected_num_stories,
+        **params
+    } for k, story in enumerate(stories)]
+
 def generate_simple_story(gen_model, params: dict):
     prompt, expected_num_stories = create_simple_story_prompt(params.copy())
-    id = hashlib.md5(prompt.encode()).hexdigest()
     
     try:
         completion = generate_content(gen_model, prompt)
-        stories = [x.strip() for x in completion.split(END_STRING) if len(x.strip()) > 1]
-        if (len(stories) != expected_num_stories):
-            print(f"Completion did not include expected number of stories, actual={len(stories)} != expected={expected_num_stories}\nend of completion: {completion[-100:]}")
-        return [{
-            'generation_id': id + "-" + str(k),
-            'story': story,
-            'model': gen_model,
-            'num_stories_in_completion': len(stories),
-            "expected_num_stories_in_completion": expected_num_stories,
-            **params
-        } for k, story in enumerate(stories)]
+        return process_completion(gen_model, completion, params, expected_num_stories)
     except Exception as e:
         # TODO Implement Rate Limit Logic for different APIs
         raise RateLimitException(e)
@@ -138,4 +151,4 @@ def main(num_completions: int, num_threads: int = 20, model = "gpt-4o-mini"):
 if __name__ == '__main__':
     NUM_COMPLETIONS = 200
 
-    main(NUM_COMPLETIONS, num_threads=50, model="claude-3-5-sonnet-20240620")
+    main(NUM_COMPLETIONS, num_threads=50, model="gpt-4o-mini")
