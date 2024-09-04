@@ -171,8 +171,8 @@ def main(num_completions: int, num_threads: int = 20, model = "gpt-4o-mini"):
             except Exception as e:
                 print(f"Story generation failed with exception: {e}")
 
+
 # Reference models: ["gpt-4o", "gpt-4o-mini", "claude-sonnet-3.5-20240620"]
 if __name__ == '__main__':
     NUM_COMPLETIONS = 200
-
     main(NUM_COMPLETIONS, num_threads=50, model="gpt-4o-mini")

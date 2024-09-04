@@ -1,3 +1,5 @@
 tiktoken
 openai
 anthropic
+nltk
+textstat
