@@ -5,3 +5,6 @@ logs/
 __pycache__/
 
 *.jsonl
+*.html
+*.parquet
+*ids.txt
