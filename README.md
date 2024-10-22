@@ -1,4 +1,4 @@
-## TinyStories Extention
+## SimpleStories Extention
 - Creating an updated dataset of (TinyStories)[https://arxiv.org/abs/2305.07759] with updated generation models.
 - Link to (model training code)[https://github.com/danbraunai/simple_stories_train]
 
